@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SotDL Interactive & Fillable VTT</title>
+    <style>
+        :root { --bg-color: #0f0f0f; --panel-bg: #1a1a1a; --text-color: #e0e0e0; --accent-color: #7a0000; --border-color: #333; --magic: #5c3a82; --ability: #2b5c3a; --gold: #d4af37; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); color: var(--text-color); padding: 20px; margin: 0; display: flex; justify-content: center; }
+        .container { background-color: var(--panel-bg); padding: 25px; border-radius: 6px; box-shadow: 0 4px 25px rgba(0,0,0,0.9); max-width: 1000px; width: 100%; border: 1px solid var(--border-color); }
+        h1, h2, h3 { color: #b30000; text-transform: uppercase; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; margin-top: 0; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        
+        label { display: block; margin-bottom: 4px; font-weight: bold; color: #aaa; font-size: 0.8em; text-transform: uppercase; }
+        input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 8px; background-color: #050505; border: 1px solid var(--border-color); color: var(--text-color); border-radius: 4px; box-sizing: border-box; font-family: inherit; }
+        textarea { resize: vertical; min-height: 80px; }
+        
+        button { padding: 8px 12px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background-color: #a30000; }
+        .btn-small { padding: 4px 8px; font-size: 0.8em; }
+
+        .stat-box { background-color: #0a0a0a; padding: 10px; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; display: flex; flex-direction: column; gap: 5px; }
+        .stat-box input { font-size: 18px; font-weight: bold; color: #b30000; text-align: center; background: transparent; border: none; border-bottom: 1px solid #444; }
+
+        .dynamic-list { background: #111; border: 1px solid #333; padding: 10px; border-radius: 4px; margin-bottom: 15px; min-height: 50px; }
+        .card { background: #1a1a1a; padding: 10px; margin-bottom: 10px; border: 1px solid #444; border-radius: 4px; }
+        .card-header { display: flex; gap: 10px; margin-bottom: 5px; align-items: center; }
+        
+        .combat-log { margin-top: 15px; padding: 15px; background-color: #000; border: 1px dashed var(--accent-color); height: 150px; overflow-y: auto; font-family: monospace; font-size: 1em; color: #ccc; }
+        .top-bar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #0a0a0a; padding: 10px; border: 1px solid #333;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="top-bar">
+        <h1 style="border:none; margin:0;">Demon Lord VTT</h1>
+        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+            <button onclick="saveCharacter()">Save to Browser</button>
+            <button onclick="loadCharacter()" style="background: #333;">Load Save</button>
+            <button onclick="exportCharacter()" style="background: #2b5c3a; margin-left: 10px;">Export File</button>
+            <button onclick="document.getElementById('importFile').click()" style="background: #5c3a82;">Import File</button>
+            <input type="file" id="importFile" style="display:none;" accept=".json" onchange="importCharacter(event)">
+        </div>
+    </div>
+    
+    <div class="grid-4" style="margin-bottom: 15px;">
+        <div><label>Character Name</label><input type="text" id="charName" value="Unnamed"></div>
+        <div><label>Level</label><input type="number" id="charLevel" value="0"></div>
+        <div><label>Power</label><input type="number" id="charPower" value="0" style="color:#5c3a82; font-weight:bold;"></div>
+        <div><label>Boons (+) / Banes (-)</label><input type="number" id="tempBoons" value="0"></div>
+    </div>
+
+    <div class="grid-4" style="margin-bottom: 15px; background: #111; padding: 10px; border: 1px solid #333; border-radius: 4px;">
+        <div>
+            <label>Ancestry</label>
+            <select id="ancestry">
+                <option value="none">-- Select --</option>
+                <option value="changeling">Changeling</option><option value="clockwork">Clockwork</option>
+                <option value="dwarf">Dwarf</option><option value="goblin">Goblin</option>
+                <option value="human">Human</option><option value="orc">Orc</option>
+            </select>
+        </div>
+        <div>
+            <label>Novice Path</label>
+            <select id="novicePath">
+                <option value="none">-- Select --</option>
+                <option value="magician">Magician</option><option value="priest">Priest</option>
+                <option value="rogue">Rogue</option><option value="warrior">Warrior</option>
+            </select>
+        </div>
+        <div>
+            <label>Expert Path</label>
+            <select id="expertPath">
+                <option value="none">-- Select --</option>
+                <option value="artificer">Artificer</option><option value="assassin">Assassin</option><option value="berserker">Berserker</option>
+                <option value="cleric">Cleric</option><option value="druid">Druid</option><option value="fighter">Fighter</option>
+                <option value="oracle">Oracle</option><option value="paladin">Paladin</option><option value="ranger">Ranger</option>
+                <option value="scout">Scout</option><option value="sorcerer">Sorcerer</option><option value="spellbinder">Spellbinder</option>
+                <option value="thief">Thief</option><option value="warlock">Warlock</option><option value="witch">Witch</option><option value="wizard">Wizard</option>
+            </select>
+        </div>
+        <div>
+            <label>Master Path</label>
+            <select id="masterPath">
+                <option value="none">-- Select --</option>
+                <option value="acrobat">Acrobat</option><option value="aeromancer">Aeromancer</option><option value="apocalyptist">Apocalyptist</option>
+                <option value="astromancer">Astromancer</option><option value="avenger">Avenger</option><option value="bard">Bard</option>
+                <option value="beastmaster">Beastmaster</option><option value="blade">Blade</option><option value="brute">Brute</option>
+                <option value="cavalier">Cavalier</option><option value="champion">Champion</option><option value="chaplain">Chaplain</option>
+                <option value="chronomancer">Chronomancer</option><option value="conjurer">Conjurer</option><option value="conqueror">Conqueror</option>
+                <option value="cryomancer">Cryomancer</option><option value="dancer">Dancer</option><option value="deathdealer">Death Dealer</option>
+                <option value="defender">Defender</option><option value="dervish">Dervish</option><option value="destroyer">Destroyer</option>
+                <option value="diplomat">Diplomat</option><option value="diviner">Diviner</option><option value="dreadnaught">Dreadnaught</option>
+                <option value="duelist">Duelist</option><option value="electromancer">Electromancer</option><option value="enchanter">Enchanter</option>
+                <option value="engineer">Engineer</option><option value="executioner">Executioner</option><option value="explorer">Explorer</option>
+                <option value="geomancer">Geomancer</option><option value="gladiator">Gladiator</option><option value="gunslinger">Gunslinger</option>
+                <option value="healer">Healer</option><option value="hexer">Hexer</option><option value="hydromancer">Hydromancer</option>
+                <option value="illusionist">Illusionist</option><option value="infiltrator">Infiltrator</option><option value="inquisitor">Inquisitor</option>
+                <option value="jack">Jack-of-all-Trades</option><option value="mageknight">Mage Knight</option><option value="magus">Magus</option>
+                <option value="marauder">Marauder</option><option value="martialartist">Martial Artist</option><option value="mastermind">Mastermind</option>
+                <option value="miracleworker">Miracle Worker</option><option value="mountaineer">Mountaineer</option><option value="necromancer">Necromancer</option>
+                <option value="poisoner">Poisoner</option><option value="pyromancer">Pyromancer</option><option value="runesmith">Runesmith</option>
+                <option value="savage">Savage</option><option value="sentinel">Sentinel</option><option value="shapeshifter">Shapeshifter</option>
+                <option value="sharpshooter">Sharpshooter</option><option value="spy">Spy</option><option value="stormbringer">Stormbringer</option>
+                <option value="technomancer">Technomancer</option><option value="templar">Templar</option><option value="thaumaturge">Thaumaturge</option>
+                <option value="theurge">Theurge</option><option value="transmuter">Transmuter</option><option value="traveler">Traveler</option>
+                <option value="weaponmaster">Weapon Master</option><option value="woodwose">Woodwose</option><option value="zealot">Zealot</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="grid-4" style="margin-bottom:15px;">
+        <div class="stat-box">
+            <label>STR</label>
+            <input type="number" id="statStr" value="10" onchange="calculateHealth()">
+            <button class="btn-small" style="background:#333;" onclick="rollChallenge('Str')">Roll</button>
+        </div>
+        <div class="stat-box">
+            <label>AGI</label>
+            <input type="number" id="statAgi" value="10">
+            <button class="btn-small" style="background:#333;" onclick="rollChallenge('Agi')">Roll</button>
+        </div>
+        <div class="stat-box">
+            <label>INT</label>
+            <input type="number" id="statInt" value="10">
+            <button class="btn-small" style="background:#333;" onclick="rollChallenge('Int')">Roll</button>
+        </div>
+        <div class="stat-box">
+            <label>WIL</label>
+            <input type="number" id="statWil" value="10">
+            <button class="btn-small" style="background:#333;" onclick="rollChallenge('Wil')">Roll</button>
+        </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom: 15px; background: #0a0a0a; padding: 15px; border: 1px solid #333; border-radius: 4px;">
+        <div>
+            <label style="color:var(--accent-color);">Path Health Bonuses</label>
+            <p style="font-size:0.75em; color:#888; margin-top:0;">Type the +Health you gain from leveling up here.</p>
+            <input type="number" id="bonusHealth" value="0" onchange="calculateHealth()">
+        </div>
+        <div style="text-align: right;">
+            <label>Max Health (STR + Bonuses)</label>
+            <input type="number" id="maxHealth" value="10" readonly style="font-size: 24px; color: #b30000; text-align: right; background: transparent; border: none;">
+        </div>
+    </div>
+
+    <div class="grid-4" style="margin-bottom: 15px; background: #111; padding: 15px; border: 1px solid var(--gold); border-radius: 4px;">
+        <div style="grid-column: span 4; color: var(--gold); font-weight: bold; text-transform: uppercase; margin-bottom: -5px;">Wealth & Coin</div>
+        <div><label>Gold (GC)</label><input type="number" id="wealthGC" value="0"></div>
+        <div><label>Silver (SS)</label><input type="number" id="wealthSS" value="0"></div>
+        <div><label>Copper (CP)</label><input type="number" id="wealthCP" value="0"></div>
+        <div><label>Bits (BP)</label><input type="number" id="wealthBP" value="0"></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom: 20px;">
+        <div>
+            <h3 style="color: #aaa; border-bottom: 1px solid #444; margin-bottom: 10px;">Backpack & Gear</h3>
+            <textarea id="inventoryGear" placeholder="Torches, rope, rations, potions, armor..."></textarea>
+        </div>
+        <div>
+            <h3 style="color: #aaa; border-bottom: 1px solid #444; margin-bottom: 10px;">Character Notes</h3>
+            <textarea id="characterNotes" placeholder="Professions, background, quest notes..."></textarea>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3>Weapons & Attacks</h3>
+            <button class="btn-small" onclick="addWeapon()">+ Add Weapon</button>
+        </div>
+        <div id="weaponsList" class="dynamic-list"></div>
+    </div>
+
+    <div class="grid-2">
+        <div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="color:var(--ability); border-color:var(--ability);">Role Abilities</h3>
+                <button class="btn-small" style="background:var(--ability);" onclick="addAbility()">+ Add Ability</button>
+            </div>
+            <div id="abilitiesList" class="dynamic-list"></div>
+        </div>
+        <div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="color:var(--magic); border-color:var(--magic);">Spellbook</h3>
+                <button class="btn-small" style="background:var(--magic);" onclick="addSpell()">+ Add Spell</button>
+            </div>
+            <div id="spellsList" class="dynamic-list"></div>
+        </div>
+    </div>
+
+    <h3 style="margin-top: 20px;">Combat Log <button class="btn-small" onclick="clearLog()" style="float:right; background:#333;">Clear Log</button></h3>
+    <div class="combat-log" id="combatLog">Awaiting action...</div>
+
+</div>
+
+<script>
+    // --- STATE MANAGEMENT ---
+    let charData = {
+        weapons: [],
+        abilities: [],
+        spells: []
+    };
+
+    // --- HEALTH AUTO-CALCULATION ---
+    function calculateHealth() {
+        const str = parseInt(document.getElementById('statStr').value) || 0;
+        const bonus = parseInt(document.getElementById('bonusHealth').value) || 0;
+        document.getElementById('maxHealth').value = str + bonus;
+    }
+
+    // --- WEAPONS ENGINE ---
+    function addWeapon() {
+        charData.weapons.push({ id: Date.now(), name: "New Weapon", stat: "Str", dice: 1, sides: 6, bonus: 0 });
+        renderWeapons();
+    }
+
+    function removeWeapon(id) {
+        charData.weapons = charData.weapons.filter(w => w.id !== id);
+        renderWeapons();
+    }
+
+    function updateWeapon(id, field, value) {
+        let weapon = charData.weapons.find(w => w.id === id);
+        if(weapon) {
+            if(field === 'dice' || field === 'sides' || field === 'bonus') weapon[field] = parseInt(value) || 0;
+            else weapon[field] = value;
+        }
+    }
+
+    function renderWeapons() {
+        const list = document.getElementById('weaponsList');
+        list.innerHTML = "";
+        charData.weapons.forEach(w => {
+            list.innerHTML += `
+                <div class="card" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+                    <input type="text" value="${w.name}" onchange="updateWeapon(${w.id}, 'name', this.value)" style="flex: 2; min-width: 120px;">
+                    <select onchange="updateWeapon(${w.id}, 'stat', this.value)" style="width: 80px;">
+                        <option value="Str" ${w.stat === 'Str' ? 'selected' : ''}>STR</option>
+                        <option value="Agi" ${w.stat === 'Agi' ? 'selected' : ''}>AGI</option>
+                        <option value="Int" ${w.stat === 'Int' ? 'selected' : ''}>INT</option>
+                        <option value="Wil" ${w.stat === 'Wil' ? 'selected' : ''}>WIL</option>
+                    </select>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <input type="number" value="${w.dice}" onchange="updateWeapon(${w.id}, 'dice', this.value)" style="width:50px;"> d
+                        <input type="number" value="${w.sides}" onchange="updateWeapon(${w.id}, 'sides', this.value)" style="width:50px;"> +
+                        <input type="number" value="${w.bonus}" onchange="updateWeapon(${w.id}, 'bonus', this.value)" style="width:50px;">
+                    </div>
+                    <div style="display:flex; gap:5px; margin-left: auto;">
+                        <button class="btn-small" onclick="rollWeaponAttack(${w.id})">Attack</button>
+                        <button class="btn-small" onclick="rollWeaponDamage(${w.id})">Damage</button>
+                        <button class="btn-small" style="background:#444;" onclick="removeWeapon(${w.id})">X</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // --- ABILITIES & SPELLS (Fillable) ---
+    function addAbility() { charData.abilities.push({ id: Date.now(), name: "", desc: "" }); renderAbilities(); }
+    function removeAbility(id) { charData.abilities = charData.abilities.filter(a => a.id !== id); renderAbilities(); }
+    function updateAbility(id, field, value) { let a = charData.abilities.find(a => a.id === id); if(a) a[field] = value; }
+
+    function renderAbilities() {
+        const list = document.getElementById('abilitiesList');
+        list.innerHTML = "";
+        charData.abilities.forEach(a => {
+            list.innerHTML += `
+                <div class="card" style="border-left: 3px solid var(--ability);">
+                    <div class="card-header">
+                        <input type="text" placeholder="Ability Name..." value="${a.name}" onchange="updateAbility(${a.id}, 'name', this.value)" style="flex-grow: 1;">
+                        <button class="btn-small" style="background:#444;" onclick="removeAbility(${a.id})">X</button>
+                    </div>
+                    <textarea placeholder="Description..." onchange="updateAbility(${a.id}, 'desc', this.value)">${a.desc}</textarea>
+                </div>
+            `;
+        });
+    }
+
+    function addSpell() { charData.spells.push({ id: Date.now(), name: "", trad: "", rank: 0, desc: "" }); renderSpells(); }
+    function removeSpell(id) { charData.spells = charData.spells.filter(s => s.id !== id); renderSpells(); }
+    function updateSpell(id, field, value) { let s = charData.spells.find(s => s.id === id); if(s) s[field] = value; }
+
+    function renderSpells() {
+        const list = document.getElementById('spellsList');
+        list.innerHTML = "";
+        charData.spells.forEach(s => {
+            list.innerHTML += `
+                <div class="card" style="border-left: 3px solid var(--magic);">
+                    <div class="card-header">
+                        <input type="text" placeholder="Spell Name" value="${s.name}" onchange="updateSpell(${s.id}, 'name', this.value)" style="flex: 2;">
+                        <input type="text" placeholder="Tradition" value="${s.trad}" onchange="updateSpell(${s.id}, 'trad', this.value)" style="flex: 1;">
+                        <input type="number" placeholder="Rank" value="${s.rank}" onchange="updateSpell(${s.id}, 'rank', this.value)" style="width: 60px;">
+                        <button class="btn-small" style="background:#444;" onclick="removeSpell(${s.id})">X</button>
+                    </div>
+                    <textarea placeholder="Spell effects..." onchange="updateSpell(${s.id}, 'desc', this.value)">${s.desc}</textarea>
+                </div>
+            `;
+        });
+    }
+
+    // --- DICE ROLLER LOGIC ---
+    function getModifier(statValue) { return statValue - 10; }
+    
+    function getBoons() { 
+        let boons = parseInt(document.getElementById('tempBoons').value) || 0;
+        if (boons === 0) return 0;
+        let highest = 0;
+        for(let i=0; i<Math.abs(boons); i++) {
+            let r = Math.floor(Math.random() * 6) + 1;
+            if (r > highest) highest = r;
+        }
+        return boons > 0 ? highest : -highest;
+    }
+
+    function rollChallenge(statCode) {
+        const statVal = parseInt(document.getElementById(`stat${statCode}`).value);
+        const mod = getModifier(statVal);
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        const boonVal = getBoons();
+        const total = d20 + mod + boonVal;
+        
+        const bText = boonVal !== 0 ? ` (B/B: ${boonVal})` : "";
+        const result = total >= 10 ? "<span style='color:green'>SUCCESS</span>" : "<span style='color:red'>FAILURE</span>";
+        logMessage(`<b>${statCode.toUpperCase()} CHALLENGE:</b> Roll(1d20): ${d20} + Mod: ${mod}${bText} = <b>${total}</b> ... ${result}`);
+    }
+
+    function rollWeaponAttack(id) {
+        const w = charData.weapons.find(w => w.id === id);
+        const statVal = parseInt(document.getElementById(`stat${w.stat}`).value);
+        const mod = getModifier(statVal);
+        const d20 = Math.floor(Math.random() * 20) + 1;
+        const boonVal = getBoons();
+        const total = d20 + mod + boonVal;
+        logMessage(`<b>ATTACK (${w.name}):</b> Roll(1d20): ${d20} + ${w.stat} Mod: ${mod} ${boonVal !== 0 ? `(B/B: ${boonVal})` : ""} = <b>${total}</b>`);
+    }
+
+    function rollWeaponDamage(id) {
+        const w = charData.weapons.find(w => w.id === id);
+        let dmg = 0;
+        let rolls = [];
+        for(let i=0; i<w.dice; i++) {
+            let r = Math.floor(Math.random() * w.sides) + 1;
+            rolls.push(r);
+            dmg += r;
+        }
+        dmg += w.bonus;
+        const bonusTxt = w.bonus !== 0 ? ` + ${w.bonus}` : "";
+        logMessage(`<b>DAMAGE (${w.name}):</b> [${rolls.join(", ")}]${bonusTxt} = <span style='color:red;'><b>${dmg} damage!</b></span>`);
+    }
+
+    function logMessage(msg) {
+        const log = document.getElementById('combatLog');
+        log.innerHTML = `<div style="margin-bottom: 5px; border-bottom: 1px dashed #333; padding-bottom: 5px;">${msg}</div>` + log.innerHTML;
+    }
+
+    function clearLog() { document.getElementById('combatLog').innerHTML = "Awaiting action..."; }
+
+    // --- SAVE / LOAD / EXPORT / IMPORT FUNCTIONALITY ---
+    
+    function collectData() {
+        charData.name = document.getElementById('charName').value;
+        charData.level = document.getElementById('charLevel').value;
+        charData.power = document.getElementById('charPower').value;
+        
+        charData.ancestry = document.getElementById('ancestry').value;
+        charData.novicePath = document.getElementById('novicePath').value;
+        charData.expertPath = document.getElementById('expertPath').value;
+        charData.masterPath = document.getElementById('masterPath').value;
+
+        charData.str = document.getElementById('statStr').value;
+        charData.agi = document.getElementById('statAgi').value;
+        charData.int = document.getElementById('statInt').value;
+        charData.wil = document.getElementById('statWil').value;
+        charData.bonusHealth = document.getElementById('bonusHealth').value;
+
+        charData.wealthGC = document.getElementById('wealthGC').value;
+        charData.wealthSS = document.getElementById('wealthSS').value;
+        charData.wealthCP = document.getElementById('wealthCP').value;
+        charData.wealthBP = document.getElementById('wealthBP').value;
+
+        charData.inventoryGear = document.getElementById('inventoryGear').value;
+        charData.characterNotes = document.getElementById('characterNotes').value;
+    }
+
+    function applyData() {
+        document.getElementById('charName').value = charData.name || "";
+        document.getElementById('charLevel').value = charData.level || 0;
+        document.getElementById('charPower').value = charData.power || 0;
+        
+        document.getElementById('ancestry').value = charData.ancestry || "none";
+        document.getElementById('novicePath').value = charData.novicePath || "none";
+        document.getElementById('expertPath').value = charData.expertPath || "none";
+        document.getElementById('masterPath').value = charData.masterPath || "none";
+
+        document.getElementById('statStr').value = charData.str || 10;
+        document.getElementById('statAgi').value = charData.agi || 10;
+        document.getElementById('statInt').value = charData.int || 10;
+        document.getElementById('statWil').value = charData.wil || 10;
+        document.getElementById('bonusHealth').value = charData.bonusHealth || 0;
+
+        document.getElementById('wealthGC').value = charData.wealthGC || 0;
+        document.getElementById('wealthSS').value = charData.wealthSS || 0;
+        document.getElementById('wealthCP').value = charData.wealthCP || 0;
+        document.getElementById('wealthBP').value = charData.wealthBP || 0;
+
+        document.getElementById('inventoryGear').value = charData.inventoryGear || "";
+        document.getElementById('characterNotes').value = charData.characterNotes || "";
+
+        calculateHealth();
+        renderWeapons();
+        renderAbilities();
+        renderSpells();
+    }
+
+    function saveCharacter() {
+        collectData();
+        localStorage.setItem('sotdl_ultimate_save', JSON.stringify(charData));
+        logMessage("<span style='color:green'>Character Data Saved to Browser!</span>");
+    }
+
+    function loadCharacter() {
+        const saved = localStorage.getItem('sotdl_ultimate_save');
+        if (saved) {
+            charData = JSON.parse(saved);
+            applyData();
+            logMessage("<span style='color:green'>Character Data Loaded from Browser!</span>");
+        } else {
+            logMessage("<span style='color:red'>No save file found in this browser.</span>");
+        }
+    }
+
+    function exportCharacter() {
+        collectData(); 
+        const dataStr = JSON.stringify(charData, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        
+        let fileName = (charData.name || "Unnamed_Character").replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        a.download = fileName + "_sotdl.json";
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        logMessage("<span style='color:green'>Character Exported to File!</span>");
+    }
+
+    function importCharacter(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                charData = importedData;
+                applyData();
+                logMessage("<span style='color:green'>Character File Imported Successfully!</span>");
+            } catch (err) {
+                logMessage("<span style='color:red'>Error parsing file. Ensure it is a valid JSON character file.</span>");
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = "";
+    }
+
+    // Initialize UI
+    calculateHealth();
+    renderWeapons();
+    renderAbilities();
+    renderSpells();
+</script>
+
+</body>
+</html>
